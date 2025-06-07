@@ -1,7 +1,7 @@
 import numpy as np
 import pygame
 import numpy as np
-from constants import SIZE, ZOMBIE_SPEED
+from constants import SIZE, ZOMBIE_SPEED, WIDTH, HEIGHT
 import random
 
 
@@ -63,6 +63,10 @@ class Player(Object):
         super().__init__(x, y, "Timmy")
         self.health = 100
 
+    def reset(self):
+        self.moveTo(WIDTH // 2, HEIGHT // 2)
+        self.health = 100
+
 
 class BaseZombie(Object):
     def __init__(self, x=0, y=0):
@@ -79,6 +83,18 @@ class BaseZombie(Object):
                 player.health = max(player.health - damage, 0)
                 self.last_attack_step = current_step
 
+    def reset(self, player):
+        while True:
+            x = random.randint(0, WIDTH - SIZE)
+            y = random.randint(0, HEIGHT - SIZE)
+            dist = ((x - player.rect.x) ** 2 +
+                    (y - player.rect.y) ** 2) ** 0.5
+            if dist >= 100:
+                self.moveTo(x, y)
+                self.last_attack_step = - \
+                    self.cooldown_steps
+                break
+
 
 class WandererZombie(BaseZombie):
     def __init__(self, x=0, y=0):
@@ -86,7 +102,7 @@ class WandererZombie(BaseZombie):
         self.move_timer = 0
         self.direction = (0, 0)
         self.steps_in_direction = 0
-        self.wander_speed = ZOMBIE_SPEED  # Initial speed, will be randomized in Wander()
+        self.wander_speed = ZOMBIE_SPEED
 
     def Wander(self, player):
         if self.move_timer == 0 or self.steps_in_direction <= 0:
@@ -106,8 +122,8 @@ class WandererZombie(BaseZombie):
                                       random.choice([-1, 0, 1]))
                 self.steps_in_direction = random.randint(5, 25)
 
-            # Randomize speed between ZOMBIE_SPEED and ZOMBIE_SPEED + 3
-            self.wander_speed = random.uniform(ZOMBIE_SPEED, ZOMBIE_SPEED + 3)
+            self.wander_speed = random.uniform(
+                ZOMBIE_SPEED-2, ZOMBIE_SPEED + 2)
             self.move_timer = self.steps_in_direction
 
         dx, dy = self.direction
@@ -122,6 +138,7 @@ class DasherZombie(BaseZombie):
     def __init__(self, x=0, y=0):
         super().__init__(x, y)
         self.cooldown = 0
+        self.MAX_COOLDOWN = 75
 
     def dash(self, timmy_pos):
         tim_x, tim_y = timmy_pos
@@ -132,6 +149,6 @@ class DasherZombie(BaseZombie):
             new_x = z_x + 2 * direction[0] * SIZE
             new_y = z_y + 2 * direction[1] * SIZE
             self.moveTo(new_x, new_y)
-            self.cooldown = 100
+            self.cooldown = self.MAX_COOLDOWN
         else:
             self.cooldown -= 1

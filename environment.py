@@ -52,22 +52,12 @@ class ZombieEnvironment(gym.Env):
         self.clock.tick(60)
 
     def reset(self):
-        self.player.moveTo(WIDTH // 2, HEIGHT // 2)
-        self.player.health = 100  # start with full health, better for training
+        self.player.reset()
         self.corner_time = 0
         self.steps = 0
 
-        for i in range(len(self.zombies)):
-            while True:
-                x = random.randint(0, WIDTH - SIZE)
-                y = random.randint(0, HEIGHT - SIZE)
-                dist = ((x - self.player.rect.x) ** 2 +
-                        (y - self.player.rect.y) ** 2) ** 0.5
-                if dist >= 100:
-                    self.zombies[i].moveTo(x, y)
-                    self.zombies[i].last_attack_step = - \
-                        self.zombies[i].cooldown_steps
-                    break
+        for z in self.zombies:
+            z.reset(self.player)
 
         return self._get_obs()
 
@@ -159,7 +149,6 @@ class ZombieEnvironment(gym.Env):
         return self._get_obs(), reward, done, {}
 
     def _get_obs(self):
-        # Normalize health to [0,1]
         obs = [self.player.rect.x / WIDTH,
                self.player.rect.y / HEIGHT,
                self.player.health / 100]
