@@ -20,10 +20,12 @@ class ZombieEnvironment(gym.Env):
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
         self.clock = pygame.time.Clock()
         self.zombies = [WandererZombie(), BaseZombie(),
-                        DasherZombie()]
+                        BaseZombie(), DasherZombie()]
         self.player = Player()
 
-        obs_len = 3 + 2 * len(self.zombies)
+        num_dashers = sum(isinstance(z, DasherZombie) for z in self.zombies)
+        obs_len = 3 + 2 * len(self.zombies) + num_dashers
+
         self.observation_space = spaces.Box(
             low=0, high=1, shape=(obs_len,), dtype=np.float32)
         self.action_space = spaces.Discrete(4)
@@ -67,24 +69,12 @@ class ZombieEnvironment(gym.Env):
         reward = 1.0
         old_x, old_y = self.player.rect.x, self.player.rect.y
 
-        # Player movement
-        if action == 0:
-            self.player.move(0, PLAYER_SPEED)
-        elif action == 1:
-            self.player.move(0, -PLAYER_SPEED)
-        elif action == 2:
-            self.player.move(-PLAYER_SPEED, 0)
-        elif action == 3:
-            self.player.move(PLAYER_SPEED, 0)
-
-        # Clamp player inside screen
-        self.player.rect.x = max(0, min(self.player.rect.x, WIDTH - SIZE))
-        self.player.rect.y = max(0, min(self.player.rect.y, HEIGHT - SIZE))
+        # Player handles movement + clamping
+        self.player.update(action)
 
         movement_distance = ((self.player.rect.x - old_x) ** 2 +
                              (self.player.rect.y - old_y) ** 2) ** 0.5
 
-        # Detect proximity to edge
         dist_left = self.player.rect.x
         dist_right = WIDTH - (self.player.rect.x + SIZE)
         dist_top = self.player.rect.y
@@ -100,45 +90,23 @@ class ZombieEnvironment(gym.Env):
         else:
             self.corner_time = 0
 
+        # Update zombies
         for z in self.zombies:
-            if isinstance(z, WandererZombie):
-                z.Wander(self.player)
-            else:
-                # BaseZombie just chases the player
-                target_x = self.player.rect.centerx
-                target_y = self.player.rect.centery
-                dx = target_x - z.rect.centerx
-                dy = target_y - z.rect.centery
+            z.update(self.player, self.zombies, self.steps)
 
-                neighbors = self.get_neighbors(z)
-                sep_x, sep_y = 0, 0
-                for other in neighbors:
-                    offset_x = z.rect.centerx - other.rect.centerx
-                    offset_y = z.rect.centery - other.rect.centery
-                    distance = max((offset_x**2 + offset_y**2) ** 0.5, 0.1)
-                    sep_x += offset_x / distance
-                    sep_y += offset_y / distance
+        # Distance-based reward from zombies
+        total_distance = 0
+        for z in self.zombies:
+            dx = self.player.rect.centerx - z.rect.centerx
+            dy = self.player.rect.centery - z.rect.centery
+            dist = (dx ** 2 + dy ** 2) ** 0.5
+            total_distance += dist
 
-                if neighbors:
-                    sep_x /= len(neighbors)
-                    sep_y /= len(neighbors)
+        avg_distance = total_distance / len(self.zombies)
+        safe_distance_reward = min(
+            avg_distance / 100, 1.0)  # Scale and cap at 1.0
+        reward += safe_distance_reward * 0.5  # Tweak scaling factor as needed
 
-                move_x = dx + sep_x * 25
-                move_y = dy + sep_y * 25
-
-                mag = max((move_x**2 + move_y**2) ** 0.5, 1)
-                z.move(int(ZOMBIE_SPEED * move_x / mag),
-                       int(ZOMBIE_SPEED * move_y / mag))
-
-                if isinstance(z, DasherZombie):
-                    z.dash((self.player.rect.centerx, self.player.rect.centery))
-
-            z.attack(self.player, self.steps)
-            # Keep zombies inside bounds
-            z.rect.x = max(0, min(z.rect.x, WIDTH - SIZE))
-            z.rect.y = max(0, min(z.rect.y, HEIGHT - SIZE))
-
-        # Health change impact
         health_change = self.player.health - old_health
         reward += health_change * 0.5
 
@@ -154,4 +122,8 @@ class ZombieEnvironment(gym.Env):
                self.player.health / 100]
         for z in self.zombies:
             obs += [z.rect.x / WIDTH, z.rect.y / HEIGHT]
+
+        for z in self.zombies:
+            if isinstance(z, DasherZombie):
+                obs += [z.cooldown]
         return np.array(obs, dtype=np.float32)

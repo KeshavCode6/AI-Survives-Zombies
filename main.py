@@ -3,7 +3,7 @@ import pygame
 from environment import ZombieEnvironment
 from constants import total_timesteps, eval_interval, episodes_per_eval
 
-train = False
+train = True
 
 env = ZombieEnvironment(train)
 model = None
