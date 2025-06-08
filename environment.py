@@ -23,9 +23,7 @@ class ZombieEnvironment(gym.Env):
                         BaseZombie(), DasherZombie()]
         self.player = Player()
 
-        num_dashers = sum(isinstance(z, DasherZombie) for z in self.zombies)
-        obs_len = 3 + 2 * len(self.zombies) + num_dashers
-
+        obs_len = 3 + 2 * len(self.zombies)
         self.observation_space = spaces.Box(
             low=0, high=1, shape=(obs_len,), dtype=np.float32)
         self.action_space = spaces.Discrete(4)
@@ -104,9 +102,9 @@ class ZombieEnvironment(gym.Env):
 
         avg_distance = total_distance / len(self.zombies)
         safe_distance_reward = min(
-            avg_distance / 100, 1.0)  # Scale and cap at 1.0
-        reward += safe_distance_reward * 0.5  # Tweak scaling factor as needed
+            avg_distance / 100, 1.0)
 
+        reward += safe_distance_reward
         health_change = self.player.health - old_health
         reward += health_change * 0.5
 
@@ -123,7 +121,4 @@ class ZombieEnvironment(gym.Env):
         for z in self.zombies:
             obs += [z.rect.x / WIDTH, z.rect.y / HEIGHT]
 
-        for z in self.zombies:
-            if isinstance(z, DasherZombie):
-                obs += [z.cooldown]
         return np.array(obs, dtype=np.float32)

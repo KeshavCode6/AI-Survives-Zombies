@@ -3,14 +3,14 @@ import pygame
 from environment import ZombieEnvironment
 from constants import total_timesteps, eval_interval, episodes_per_eval
 
-train = True
+train = False
 
 env = ZombieEnvironment(train)
 model = None
 if train:
     model = PPO("MlpPolicy", env, verbose=1, device="cuda")
 else:
-    model = PPO.load("models/rectangle")
+    model = PPO.load("models/super.zip")
 
 
 def runEpisodes(number):
@@ -44,6 +44,6 @@ if train:
         runEpisodes(episodes_per_eval)
         model.save(f"timmy_ppo_model_{timesteps_trained}")
 else:
-    runEpisodes(5)
+    runEpisodes(10)
 
 env.close()
